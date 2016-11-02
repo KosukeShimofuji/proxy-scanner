@@ -4,6 +4,9 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <netdb.h>
+#include <openssl/ssl.h>
+#include <openssl/err.h>
 #include <unistd.h>
 #include <errno.h>
 
@@ -24,6 +27,10 @@ int main(){
     char len = 0;
     char recv_buf[MAX_BUF];
     char header[MAX_BUF*2];
+    int err = 0;
+
+    SSL *ssl;
+    SSL_CTX *ctx;
 
     if((sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1){
         perror("socket");
@@ -73,8 +80,8 @@ int main(){
             0x01  /* ip v4 */
         };
 
-        addr.sin_port = htons(80);
-        addr.sin_addr.s_addr = inet_addr("59.106.174.199");
+        addr.sin_port = htons(443);
+        addr.sin_addr.s_addr = inet_addr("202.16.128.23");
 
         memcpy(step_two_request + 4, &addr.sin_addr.s_addr, 4);
         memcpy(step_two_request + 8, &addr.sin_port, 2);
@@ -89,22 +96,37 @@ int main(){
             printf("[+] RECVED DATA(%d): ", len);
             print_hex(recv_buf, len);
 
-            sprintf(header, "GET /e/ HTTP/1.1\r\n"
-                            "Host: taruo.net\r\n\r\n"); 
-            printf("\nHeader...\n%s", header);
-            send(sock, header, strlen(header), 0);
+            SSL_load_error_strings();
+            SSL_library_init();
+            ctx = SSL_CTX_new(SSLv23_client_method());
+            ssl = SSL_new(ctx);
+            err = SSL_set_fd(ssl, sock);
+            SSL_connect(ssl);
 
-            memset(recv_buf, '\0', MAX_BUF);
+            sprintf(header, "GET /~tagami/cgi-bin/proxychk/env.cgi HTTP/1.1\r\n"
+                            "Host: www.cc.sojo-u.ac.jp\r\n\r\n"); 
+            SSL_write(ssl, header, strlen(header));
 
-            //if ( recv(sock, recv_buf, MAX_BUF, 0) > 0)
-            //      printf("out...\n%s\n", recv_buf);
-            len = recv(sock, recv_buf, MAX_BUF, 0);
-            printf("RECV_LEN : %d\n", len);
-            printf("%s\n", recv_buf);
+            int buf_size = 256;
+            char buf[buf_size];
+            int read_size;
+
+            do {
+                read_size = SSL_read(ssl, buf, buf_size);
+                write(1, buf, read_size);
+            } while(read_size > 0);
+
+            printf("%s\n", buf);
+
+            SSL_shutdown(ssl);
+            SSL_free(ssl);
+            SSL_CTX_free(ctx);
+            ERR_free_strings();
+
         }
     }
 
-    CONNECTION_END:
+CONNECTION_END:
     close(sock);
 
     return 0;
