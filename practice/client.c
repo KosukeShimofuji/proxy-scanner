@@ -7,7 +7,7 @@
 #include <unistd.h>
 #include <errno.h>
 
-#define MAX_BUF 256
+#define MAX_BUF 2560
 
 void print_hex (char *buf, int size)
 {
@@ -34,7 +34,7 @@ int main(){
     addr.sin_port = htons(1080);
     addr.sin_addr.s_addr = inet_addr("192.168.10.102");
 
-    printf("[+] TARGET = %s:%d\n", inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
+    printf("[+] Target = %s:%d\n", inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
 
     if(connect(sock, (struct sockaddr *)&addr, sizeof(addr)) == -1){
         perror("connect");
@@ -91,12 +91,16 @@ int main(){
 
             sprintf(header, "GET /e/ HTTP/1.1\r\n"
                             "Host: taruo.net\r\n\r\n"); 
-            printf("\nHeader...\n%s\n", header);
+            printf("\nHeader...\n%s", header);
             send(sock, header, strlen(header), 0);
 
             memset(recv_buf, '\0', MAX_BUF);
+
+            //if ( recv(sock, recv_buf, MAX_BUF, 0) > 0)
+            //      printf("out...\n%s\n", recv_buf);
             len = recv(sock, recv_buf, MAX_BUF, 0);
-            printf("%d\n", len);
+            printf("RECV_LEN : %d\n", len);
+            printf("%s\n", recv_buf);
         }
     }
 
